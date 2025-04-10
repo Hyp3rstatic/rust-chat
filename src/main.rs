@@ -10,7 +10,7 @@ async fn serve_ftp(addr_port: String) {
       .passive_ports(50000..65535)
       .build()
       .unwrap();
-  server.listen(addr_port).await;
+  server.listen(addr_port).await.unwrap();
 }
 
 fn connect_ftp(addr_port: String) {
@@ -18,21 +18,20 @@ fn connect_ftp(addr_port: String) {
   let mut ftp_stream = FtpStream::connect(addr_port).unwrap();
   let _ = ftp_stream.login("username", "password").unwrap();
   println!("Current directory: {}", ftp_stream.pwd().unwrap());
-  let mut input = String::new();
   loop {
+    let mut input = String::new();
     stdin().read_line(&mut input).unwrap();
     if input == "exit\n" {
       println!("exiting FTP");
       break;
     }
     stdout().flush().unwrap();
-    input = String::new();
   }
 }
 
 fn connect(address: &str, port: &u16) -> Result<(), String> {
   let addr_port: String = format!("{}:{}", address, port);
-  let mut stream: TcpStream = TcpStream::connect(addr_port.clone()).map_err(|_| format!("connection to host {}:{} failed", address, port))?;
+  let mut stream: TcpStream = TcpStream::connect(addr_port.clone()).map_err(|_| format!("connection to host {} failed",addr_port))?;
   let mut input = String::new();
   loop {
     stdin().read_line(&mut input).unwrap();
