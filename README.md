@@ -1,2 +1,2 @@
-# Rust-Chat
-> Chat client with TCP and FTP support (made in Rust).
+# rust-chat
+A chat app created in rust to handle multi-user ftp and tcp communications between clients on a server
