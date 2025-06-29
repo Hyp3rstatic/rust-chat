@@ -1,4 +1,6 @@
-mod lib;
+use std::io:: {stdin};
+use chat::{connect, serve_ftp, connect_ftp, start_server};
+
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +31,7 @@ mod test {
   use std::io:: {Read, Write, stdin, stdout};
   use suppaftp::FtpStream;
   use unftp_sbe_fs::ServerExt;
+  use chat::connect;
   
   fn testconn () {
     let stream = connect("127.0.0.1", &9000).unwrap();
