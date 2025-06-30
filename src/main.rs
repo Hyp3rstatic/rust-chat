@@ -1,7 +1,6 @@
 use std::io:: {stdin};
 use chat::{connect, serve_ftp, connect_ftp, start_server};
 
-
 #[tokio::main]
 async fn main() {
   let mut input = String::new();

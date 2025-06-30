@@ -40,7 +40,6 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
       break;
     }
     else if input == "ftp\n" {
-      //Stream.write("REQUEST FTP SERVER".as_bytes()).expect("failed to write to server");
       connect_ftp("127.0.0.1:2121".to_string());
     }
     else {
