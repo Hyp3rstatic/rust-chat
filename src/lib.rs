@@ -1,33 +1,6 @@
 use std::net::{TcpStream, TcpListener};
 use std::io:: {Read, Write, stdin, stdout};
-use suppaftp::FtpStream;
-use unftp_sbe_fs::ServerExt;
 
-pub async fn serve_ftp(addr_port: String) {
-  let ftp_home = std::env::temp_dir();
-  let server = libunftp::Server::with_fs(ftp_home)
-      .greeting("Welcome to my FTP server")
-      .passive_ports(50000..65535)
-      .build()
-      .unwrap();
-  server.listen(addr_port).await.unwrap();
-}
-
-pub fn connect_ftp(addr_port: String) {
-  println!("Trying to connect via ftp");
-  let mut ftp_stream = FtpStream::connect(addr_port).unwrap();
-  let _ = ftp_stream.login("username", "password").unwrap();
-  println!("Current directory: {}", ftp_stream.pwd().unwrap());
-  loop {
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-    if input == "exit\n" {
-      println!("exiting FTP");
-      break;
-    }
-    stdout().flush().unwrap();
-  }
-}
 pub fn connect(address: &str, port: &u16) -> Result<(), String> {
   let addr_port: String = format!("{}:{}", address, port);
   let mut stream: TcpStream = TcpStream::connect(addr_port.clone()).map_err(|_| format!("connection to host {} failed",addr_port))?;
@@ -38,9 +11,6 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
     if input == "exit\n" {
       println!("disconnecting");
       break;
-    }
-    else if input == "ftp\n" {
-      connect_ftp("127.0.0.1:2121".to_string());
     }
     else {
       println!("User input: {}", input);

@@ -1,4 +1,4 @@
 >## Rust-Chat
 >
-> An FTP - *but also TCP* - experience
+> A TCP - *and not currently FTP* - experience
 >
