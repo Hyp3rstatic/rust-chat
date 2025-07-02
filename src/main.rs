@@ -13,7 +13,7 @@ async fn main() {
     connect("127.0.0.1", &8080).unwrap()
   }
   else {
-    println!("geek");
+    println!("Invalid Input - Exiting Program");
   }
 }
 
