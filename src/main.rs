@@ -14,23 +14,9 @@ async fn main() {
   }
   else {
     println!("Connecting to TCP Server on Port {}", port);
-    connect("127.0.0.1", &port).unwrap()
+    connect("127.0.0.1", &port).await.unwrap()
   }
-  /*s
-  let mut input = String::new();
-  stdin().read_line(&mut input).unwrap();
-  
-  if input == "0\n" {
-    start_server("127.0.0.1", &8080);
-    //std::thread::spawn(|| start_server("127.0.0.1", &8080));
-  }
-  else if input == "1\n" {
-    connect("127.0.0.1", &8080).unwrap()
-  }
-  else {
-    println!("Invalid Input - Exiting Program");
-  }
-  */
+
 }
 
 #[cfg(test)]
@@ -43,17 +29,12 @@ mod test {
 //on connect recieve "OK"
 //disconnect
 //close server
+//CREATE TEST ONCE PROGRAM IS MORE FUNCTIONAL
   #[test]
   fn testconn () {
 
     let port = 9090;
 
-    println!("Starting TCP Server on Port {}", port);
-    spawn(|| start_server("127.0.0.1", &port));
-    //let stream = connect("127.0.0.1", &port).unwrap();
-    //stream.write();
-    //connect("127.0.0.1", &port).unwrap();
-    
   }
 
 }
