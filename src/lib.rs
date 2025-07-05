@@ -4,6 +4,7 @@ use std::net::{TcpStream, TcpListener};
 use std::io:: {Read, Write, stdin, stdout};
 use std::thread::{spawn};
 use std::thread;
+use std::sync::mpsc;
 
 async fn recieve(mut stream: &TcpStream) {
    let mut buffer: [u8; 1024] = [0; 1024];
@@ -13,7 +14,7 @@ async fn recieve(mut stream: &TcpStream) {
    stdout().flush().unwrap();
 }
 
-async fn get_input() -> String {
+fn get_input() -> String {
   let mut input = String::new();
   print!(":");
   stdout().flush().unwrap();
@@ -21,8 +22,34 @@ async fn get_input() -> String {
   input
 }
 
+pub async fn connect(address: &str, port: &u16) -> Result<(), String> {
+  let addr_port: String = format!("{}:{}", address, port);
+  let mut stream: TcpStream = TcpStream::connect(addr_port.clone()).map_err(|_| format!("connection to host {} failed",addr_port))?;
+  let (in_chan, out_chan) = mpsc::channel();
+  println!(" --- Joined TCP Server --- ");
+  spawn(move || {
+    let input = get_input();
+    in_chan.send(input).unwrap();
+  });
+  loop {
+    match out_chan.recv() {
+      Ok(value) => {
+        //let input_recv = out_chan.recv().unwrap();
+        stream.write(value.as_bytes()).expect("failed to write input to server");
+      }
+      Err(mpsc::RecvError) => {
+
+      }
+    }
+
+    recieve(&stream).await;
+  }
+  Ok(())
+}
+
 //have recieve and send be two seperate threads, figure out how to do that with borrow rules
 //TODO: See the messages of other clients
+/*
 pub async fn connect(address: &str, port: &u16) -> Result<(), String> {
   let addr_port: String = format!("{}:{}", address, port);
   let mut stream: TcpStream = TcpStream::connect(addr_port.clone()).map_err(|_| format!("connection to host {} failed",addr_port))?;
@@ -51,6 +78,7 @@ pub async fn connect(address: &str, port: &u16) -> Result<(), String> {
   }
   Ok(())
 }
+  */
 
 //TODO: add mutex for serverside display -- later client side as well; Display the ip:port of clients
 pub fn handle_connection(mut stream: TcpStream) {
