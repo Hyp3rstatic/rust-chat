@@ -40,7 +40,6 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
     }
   });
   loop {
-
     recieve(&stream);
     match out_chan.recv() {
       Ok(input) => {
@@ -58,7 +57,6 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
       Err(mpsc::RecvError) => {
       }
     }
-    
   }
   Ok(())
 }
@@ -68,32 +66,29 @@ pub fn handle_connection(mut stream: TcpStream) {
   let response = "welcome client".as_bytes();
   let client_addr = stream.peer_addr().unwrap();
   println!("Client {}", client_addr);
-
   stream.write(response).expect("failed to write to client");
-  loop {
-        
-        let mut buffer: [u8; 1024] = [0; 1024];
-        stream.read(&mut buffer).expect("failed to read from client");
-        println!("buffer: {:?}, len: {}", buffer, buffer.len());
-        let mut request = String::from_utf8_lossy(&buffer[..]);
-        request = request.to_string().chars()
-            .filter(|c| !['\0'].contains(c))
-            .collect();
-        println!("Connection Sent Message: {}", request.trim_end());
-        if request.trim_end() == "exit".to_string() || buffer == [0; 1024] {
-          println!("closing client connection {}", client_addr);
-          stream.write("Goodbye!".as_bytes()).expect("failed to write to client");
-          let _ = stream.shutdown(Shutdown::Both);
-          break;
-        }
-        else if request.trim_end() == "top".to_string(){
-          println!("TOP");
-          stream.write("hat!".as_bytes()).expect("failed to write to client");
-        }
-        else {
-          stream.write(response).expect("failed to write to client");
-        }
-
+  loop {    
+    let mut buffer: [u8; 1024] = [0; 1024];
+    stream.read(&mut buffer).expect("failed to read from client");
+    println!("buffer: {:?}, len: {}", buffer, buffer.len());
+    let mut request = String::from_utf8_lossy(&buffer[..]);
+    request = request.to_string().chars()
+      .filter(|c| !['\0'].contains(c))
+      .collect();
+    println!("Connection Sent Message: {}", request.trim_end());
+    if request.trim_end() == "exit".to_string() || buffer == [0; 1024] {
+      println!("closing client connection {}", client_addr);
+      stream.write("Goodbye!".as_bytes()).expect("failed to write to client");
+      let _ = stream.shutdown(Shutdown::Both);
+      break;
+    }
+    else if request.trim_end() == "top".to_string(){
+      println!("TOP");
+      stream.write("hat!".as_bytes()).expect("failed to write to client");
+    }
+    else {
+      stream.write(response).expect("failed to write to client");
+    }
   }
 }
 
