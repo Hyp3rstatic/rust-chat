@@ -2,9 +2,10 @@
 
 use std::net::{TcpStream, TcpListener};
 use std::io:: {Read, Write, stdin, stdout};
-use std::thread::{spawn};
-use std::thread;
-use std::sync::mpsc;
+use std::thread::{spawn, sleep};
+use std::sync::{Mutex, mpsc, Arc};
+use std::time::{Duration};
+use std::net::{Shutdown};
 
 async fn recieve(mut stream: &TcpStream) {
    let mut buffer: [u8; 1024] = [0; 1024];
@@ -28,21 +29,29 @@ pub async fn connect(address: &str, port: &u16) -> Result<(), String> {
   let (in_chan, out_chan) = mpsc::channel();
   println!(" --- Joined TCP Server --- ");
   spawn(move || {
-    let input = get_input();
-    in_chan.send(input).unwrap();
+    loop {
+      let input = get_input();
+      in_chan.send(input).unwrap();
+    }
   });
   loop {
+    recieve(&stream).await;
     match out_chan.recv() {
-      Ok(value) => {
+      Ok(input) => {
         //let input_recv = out_chan.recv().unwrap();
-        stream.write(value.as_bytes()).expect("failed to write input to server");
+        stream.write(input.as_bytes()).expect("failed to write input to server");
+        if input == "exit\n" {
+          recieve(&stream).await;
+          //sleep(Duration::from_secs(1));
+          //println!("disconnecting");
+          break;
+        }
       }
       Err(mpsc::RecvError) => {
-
       }
     }
 
-    recieve(&stream).await;
+    
   }
   Ok(())
 }
@@ -97,7 +106,10 @@ pub fn handle_connection(mut stream: TcpStream) {
             .collect();
         println!("Connection Sent Message: {}", request.trim_end());
         if request.trim_end() == "exit".to_string(){
+          println!("closing client connection {}", client_addr);
           stream.write("Goodbye!".as_bytes()).expect("failed to write to client");
+          stream.shutdown(Shutdown::Both);
+          break;
         }
         else if request.trim_end() == "top".to_string(){
           println!("TOP");
