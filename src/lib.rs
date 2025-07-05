@@ -68,18 +68,13 @@ pub fn handle_connection(mut stream: TcpStream) {
         
         let mut buffer: [u8; 1024] = [0; 1024];
         stream.read(&mut buffer).expect("failed to read from client");
-        /*match buffer {
-          Ok(0) => {
-            println!("That's right");
-          }
-        }
-          */
+        println!("buffer: {:?}, len: {}", buffer, buffer.len());
         let mut request = String::from_utf8_lossy(&buffer[..]);
         request = request.to_string().chars()
             .filter(|c| !['\0'].contains(c))
             .collect();
         println!("Connection Sent Message: {}", request.trim_end());
-        if request.trim_end() == "exit".to_string() {
+        if request.trim_end() == "exit".to_string() || buffer == [0; 1024] {
           println!("closing client connection {}", client_addr);
           stream.write("Goodbye!".as_bytes()).expect("failed to write to client");
           let _ = stream.shutdown(Shutdown::Both);
