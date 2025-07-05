@@ -4,6 +4,11 @@ use std::thread::{spawn};
 use std::sync::{Mutex, mpsc, Arc};
 use std::net::{Shutdown};
 
+//TODO: Forward Client writes to server to all connected clients
+
+//TODO: Add Mutexes for writes to stdout
+
+// TODO: Don't break when reading nothing from server
 fn recieve(mut stream: &TcpStream) {
    let mut buffer: [u8; 1024] = [0; 1024];
    stream.read(&mut buffer).expect("failed to read from client");
@@ -35,6 +40,7 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
     }
   });
   loop {
+
     recieve(&stream);
     match out_chan.recv() {
       Ok(input) => {
@@ -52,7 +58,7 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
       Err(mpsc::RecvError) => {
       }
     }
-
+    
   }
   Ok(())
 }
