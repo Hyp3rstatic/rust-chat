@@ -1,5 +1,5 @@
 use std::net::{TcpStream, TcpListener};
-use std::io:: {Read, Write, stdin, stdout};
+use std::io:: {self, Read, Write, stdin, stdout};
 use std::thread::{spawn};
 use std::sync::{Mutex, mpsc, Arc};
 use std::net::{Shutdown};
@@ -11,16 +11,37 @@ use std::net::{Shutdown};
 // TODO: Don't break when reading nothing from server
 fn recieve(mut stream: &TcpStream) {
    let mut buffer: [u8; 1024] = [0; 1024];
-   stream.read(&mut buffer).expect("failed to read from client");
+   //stream.read(&mut buffer).expect("failed to read");
+   match stream.read(&mut buffer) {
+    Ok(0) => {
+      println!("no dataL {:?}", buffer);
+    }
+    Ok(n) => {
+
+    }
+    Err(error) => {
+
+    }
+   }
    let request = String::from_utf8_lossy(&buffer[..]);
-   println!("Recieved: {}", request);
-   stdout().flush().unwrap();
+   let writelock = {
+    let mut outlock = stdout().lock();
+    //println!("Recieved: {}", request);
+    let _ = writeln!(&mut outlock, "Recieved: {}", request);
+    //stdout().flush().unwrap();
+    stdout().flush().unwrap();
+   };
 }
 
 fn get_input() -> String {
   let mut input = String::new();
-  print!(":");
-  stdout().flush().unwrap();
+  //print!(":");
+  let lockwrite = {
+    let mut outlock = stdout().lock();
+    let _ = write!(&mut outlock, ":");
+    //outlock.flush().unwrap();
+  };
+  //stdout().flush().unwrap();
   stdin().read_line(&mut input).unwrap();
   input
 }
@@ -89,16 +110,20 @@ pub fn handle_connection(mut stream: TcpStream) {
     else {
       stream.write(response).expect("failed to write to client");
     }
+    
   }
 }
 
+//create channel 
 pub fn start_server(address: &str, port: &u16) {
   let listener: TcpListener = TcpListener::bind(&format!("{}:{}", address, port)).expect("failed to start server");
+  //let connections = [];
   println!("Server listening on {}:{}", address, port);
   for stream in listener.incoming() {
     match stream {
       Ok(stream) => {
         std::thread::spawn(|| handle_connection(stream));
+        
       }
       Err(e) => {
         eprintln!("failed to accept connection {}", e);
