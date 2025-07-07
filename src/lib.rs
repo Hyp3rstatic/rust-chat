@@ -14,7 +14,7 @@ fn recieve(mut stream: &TcpStream) {
    //stream.read(&mut buffer).expect("failed to read");
    match stream.read(&mut buffer) {
     Ok(0) => {
-      println!("no dataL {:?}", buffer);
+      //println!("no dataL {:?}", buffer);
     }
     Ok(n) => {
 
@@ -83,7 +83,8 @@ pub fn connect(address: &str, port: &u16) -> Result<(), String> {
 }
 
 //TODO: add mutex for serverside display -- later client side as well; Display the ip:port of clients
-pub fn handle_connection(mut stream: TcpStream) {
+pub fn handle_connection(mut stream: Arc<Mutex<TcpStream>>, mut connections: Arc<Mutex<Vec<Arc<Mutex<TcpStream>>>>>) {
+  let mut stream = stream.lock().unwrap();
   let response = "welcome client".as_bytes();
   let client_addr = stream.peer_addr().unwrap();
   println!("Client {}", client_addr);
@@ -91,12 +92,13 @@ pub fn handle_connection(mut stream: TcpStream) {
   loop {    
     let mut buffer: [u8; 1024] = [0; 1024];
     stream.read(&mut buffer).expect("failed to read from client");
-    println!("buffer: {:?}, len: {}", buffer, buffer.len());
+    //println!("buffer: {:?}, len: {}", buffer, buffer.len());
     let mut request = String::from_utf8_lossy(&buffer[..]);
     request = request.to_string().chars()
       .filter(|c| !['\0'].contains(c))
       .collect();
     println!("Connection Sent Message: {}", request.trim_end());
+    //TODO: remove stream from connections
     if request.trim_end() == "exit".to_string() || buffer == [0; 1024] {
       println!("closing client connection {}", client_addr);
       stream.write("Goodbye!".as_bytes()).expect("failed to write to client");
@@ -108,22 +110,25 @@ pub fn handle_connection(mut stream: TcpStream) {
       stream.write("hat!".as_bytes()).expect("failed to write to client");
     }
     else {
+
       stream.write(response).expect("failed to write to client");
     }
     
   }
 }
 
+
 //create channel 
 pub fn start_server(address: &str, port: &u16) {
   let listener: TcpListener = TcpListener::bind(&format!("{}:{}", address, port)).expect("failed to start server");
-  //let connections = [];
+  static connections:Arc<Mutex<Vec<Arc<Mutex<TcpStream>>>>> = Arc::new(Mutex::new(Vec::new()));
   println!("Server listening on {}:{}", address, port);
   for stream in listener.incoming() {
     match stream {
       Ok(stream) => {
-        std::thread::spawn(|| handle_connection(stream));
-        
+        let mut stream = Arc::new(Mutex::new(stream));
+
+        std::thread::spawn(|| handle_connection(stream, Arc::clone(&connections)));
       }
       Err(e) => {
         eprintln!("failed to accept connection {}", e);
