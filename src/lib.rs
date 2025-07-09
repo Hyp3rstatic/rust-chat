@@ -99,7 +99,9 @@ pub fn handle_connection(mut stream: Arc<Mutex<TcpStream>>, mut sender: mpsc::Se
   stream.write(response).expect("failed to write to client");
   loop {    
     let mut buffer: [u8; 1024] = [0; 1024];
-    stream.read(&mut buffer).expect("failed to read from client");
+    let _ = {
+      stream.read(&mut buffer).expect("failed to read from client");
+    };
     //let local_addr = stream.local_addr();
     //println!("buffer: {:?}, len: {}", buffer, buffer.len());
     let mut request = String::from_utf8_lossy(&buffer[..]);
@@ -114,7 +116,7 @@ pub fn handle_connection(mut stream: Arc<Mutex<TcpStream>>, mut sender: mpsc::Se
       let connections_lock = {
         //let mut stream_copy = Arc::new(Mutex::new(stream));
         println!("{:?}", connections);
-        //connections.lock().unwrap().retain(|VAL| stream.peer_addr().unwrap() != client_addr);
+        connections.lock().unwrap().retain(|VAL| stream.peer_addr().unwrap() != client_addr);
         println!("{:?}", connections);
       };
       let _ = stream.shutdown(Shutdown::Both);
@@ -127,6 +129,7 @@ pub fn handle_connection(mut stream: Arc<Mutex<TcpStream>>, mut sender: mpsc::Se
     else {
 
       stream.write(response).expect("failed to write to client");
+      sender.send(request.to_string());
     }
     
   }
@@ -140,14 +143,31 @@ pub fn start_server(address: &str, port: &u16) {
   let listener: TcpListener = TcpListener::bind(&format!("{}:{}", address, port)).expect("failed to start server");
   let mut connections:Arc<Mutex<Vec<Arc<Mutex<TcpStream>>>>> = Arc::new(Mutex::new(Vec::new()));
   println!("Server listening on {}:{}", address, port);
-  
+  let mut connections_clone = connections.clone();
   spawn(move || {
+    
     loop {
       match connection_reciever.recv() {
         Ok(message) => {
           println!("channel recieved: {}", message);
+          println!("{:?}", connections_clone);
+          println!("{:?}", connections_clone.lock().unwrap()[0]);
+          //println!("{:?}", connections_clone.lock().unwrap()[0].lock().unwrap());
+          /*let streamlock = {
+            connections_clone.lock().unwrap()[0].lock().unwrap().write("WOAHs".as_bytes()).expect("failed to write to client");
+          };
+          */
+          /*
+          for stream in connections_clone.lock().unwrap().iter() {
+            println!("EEK");
+            stream.lock().unwrap().write(message.as_bytes()).expect("failed to write to client");
+            println!("OOK");
+          }
+          */
+
         }
         Err(mpsc::RecvError) => {
+          println!("AWK");
         }
       }
     }
@@ -161,7 +181,8 @@ pub fn start_server(address: &str, port: &u16) {
         let sender = connection_sender.clone();
         connections_copy.lock().unwrap().push(stream.clone()); //Have the stream in handle_connection send a message with a stream clone value for the connections vec
         println!("{:?}", connections_copy);
-        spawn(|| handle_connection(stream, sender, connections_copy));
+        let stream_clone = stream.clone();
+        spawn(|| handle_connection(stream_clone, sender, connections_copy));
       }
       Err(e) => {
         eprintln!("failed to accept connection {}", e);
