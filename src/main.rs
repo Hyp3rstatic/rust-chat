@@ -1,8 +1,11 @@
-use rustchat::{connect, start_server, port_is_available};
+use rustchat::{connect, start_server};
+use std::net::TcpListener;
 
-fn port_is_available (addr: &str, port: u16) -> {
-  match TcpListener::bind(addr, port)) {
+fn port_is_available (addr: &str, port: u16) -> bool {
+  match TcpListener::bind((addr, port)) {
+    //bind succesful, port is available
     Ok(_) => true,
+    //bind failed, port is unavailable
     Err(_) => false,
   }
 }
@@ -17,7 +20,7 @@ fn main() {
   }
   else {
     println!("connecting to tcp server on port {}", port);
-    connect(addr, &port).unwrap()
+    connect(addr, &port)//.unwrap()
   }
 }
 
