@@ -135,40 +135,6 @@ pub fn handle_connection(mut stream: Arc<Mutex<TcpStream>>, mut sender: mpsc::Se
   }
 }
 
-/* start_server: start and run a tcp chat server */
-pub fn start_server(addr: &str, port: u16) {
-  //bind the server listener to addr and port
-  let server_listener = TcpListener::bind(&format!("{}:{}", address, port)).expect("failed to start server");
-  println!("server listening on {}:{}", addr, port);
-  /*
-    init a list of stream reader connections that can be modified across threads
-    used to broadcast messages from clients
-    infrastructure ideas:
-      1. Seperate reader and writer streams, the connection handler sends new messages to a seperate reader thread
-          the reader thread sends all incoming writes to the server (assuming they are messages) back to the connections handler
-  */
-  let mut connections = Arc::new(Mutex::new(Vec::new()));
-  
-  //handle the incoming connections to the server
-  for stream in server_listener.incoming() {
-    //on succesful connection acceptance
-    match stream {
-      Ok(stream) => {
-        let stream = Arc::new(Mutex::new(stream));
-        let mut connections_copy = connections.clone();
-        let sender = connection_sender.clone();
-        connections_copy.lock().unwrap().push(stream.clone()); //Have the stream in handle_connection send a message with a stream clone value for the connections vec
-        println!("{:?}", connections_copy);
-        let stream_clone = stream.clone();
-        spawn(|| handle_connection(stream_clone, sender, connections_copy));
-      }
-      //on connection acceptance failure
-      Err(e) => {
-        eprintln!("failed to accept connection {}", e);
-      }
-    }
-  }
-}
 
 //create channel 
 pub fn start_server(address: &str, port: &u16) {
@@ -222,5 +188,12 @@ pub fn start_server(address: &str, port: &u16) {
         eprintln!("failed to accept connection {}", e);
       }
     }
+  }
+}
+
+pub fn port_is_available(port: u16) -> bool {
+  match TcpListener::bind(("127.0.0.1", port)) {
+    Ok(_) => true,
+    Err(_) => false,
   }
 }
