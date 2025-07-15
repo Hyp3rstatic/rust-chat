@@ -1,5 +1,5 @@
 use std::net::{TcpStream, TcpListener};
-use std::io:: {Read, Write, stdin, stdout};
+use std::io:: {Read, Write, stdin, stdout, Result, ErrorKind};
 use std::thread::{spawn};
 use std::sync::mpsc::{channel, TryRecvError, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -22,12 +22,12 @@ pub fn start_server(addr: &str, port: &u16) {
   
   /*
     Handling multiple users and their messages:
-
-    names: client, server, broadcaster
-    msg written from client to server (stream)
-    msg written from server to broadcaster (channel1)
-    msg written from broadcaster to every server (channel2)
-    msg written from server to client (stream)
+      involved parties: client, server(connected to client stream), broadcaster(on independent server thread)
+        *for supporting many clients and servers; only one broadcaster
+      msg written from client to server (stream)
+      msg written from server to broadcaster (channel1)
+      msg written from broadcaster to every server (channel2)
+      msg written from server to client (stream)
   */
 
   //code for broadcaster
@@ -40,7 +40,7 @@ pub fn start_server(addr: &str, port: &u16) {
             let _sender_list_lock = {
               for sender in &mut *sender_list.lock().unwrap() {
                 //msg cloned here in send to avoid lifetime & ownership issues
-                let _ = sender.send(msg.clone()); //handle this error later
+                sender.send(msg.clone()).unwrap();
               }
             };
           }
@@ -98,7 +98,7 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
       match broadcast_receiver.try_recv() {
         //on succesful receive
         Ok(msg) => {
-          let _ = stream_broadcast_handle.write(msg.as_bytes()); //handle error later
+          stream_broadcast_handle.write(msg.as_bytes()).unwrap();
         }
         //on empty receive
         Err(TryRecvError::Empty) => {
@@ -114,11 +114,11 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
 
   loop {
     //set a buffer size for stream reads
-    let mut buffer: [u8; 1024] = [0; 1024];
+    let mut buf: [u8; 1024] = [0; 1024];
     //read any stream data sent by the client into a buffer
-    stream.read(&mut buffer).expect("failed to read from client");
+    stream.read(&mut buf).expect("failed to read from client");
     //convert the request data into a utf8 string
-    let mut request = String::from_utf8_lossy(&buffer[..]);
+    let mut request = String::from_utf8_lossy(&buf[..]);
     //remove the empty buffer from the message
     request = request.to_string().chars()
       .filter(|c| !['\0'].contains(c))
@@ -129,12 +129,64 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
     /* skipping request validation for now */
 
     //send message to broadcast thread
-    let _ = broadcast_sender.send(request.to_string().clone()); //handle error later
+    broadcast_sender.send(request.to_string().clone()).unwrap();
   }
 }
 
 /* connect: connects to a tcp server, and manages the resulting stream, as a client */
-pub fn connect (addr: &str, port: &u16) {
+pub fn connect (addr: &str, port: &u16) -> Result<()>{
+  //create client stream
+  let mut stream = TcpStream::connect(format!("{}:{}", addr, port).clone())?;
+  
+  //allow stream reads to server to be non-blocking to enable concurrent reading and writing
+  stream.set_nonblocking(true).unwrap();
 
+  //create a stream handle for the input thread
+  let mut stream_input_handler = stream.try_clone().unwrap();
+
+  //handle user inputs
+  spawn (move || {
+    //create a new input string to read stdin into
+    let mut input = String::new();
+
+    //read stdin line into input
+    stdin().read_line(&mut input).unwrap();
+    
+    //write input to server
+    stream_input_handler.write(input.as_bytes()).unwrap();
+  });
+
+
+  loop {
+    //set a buffer size for stream reads
+    let mut buf: [u8; 1024] = [0; 1024];
+    //handling nonblocking stream reads
+    match stream.read(&mut buf) {
+      //on no bytes read
+      Ok(0) => {
+        println!("server closed");
+        break;
+      }
+      //on bytes read
+      Ok(n) => {
+        //convert read data into a utf8 string
+        let mut msg = String::from_utf8_lossy(&buf[..]);
+        println!("{}", msg);
+        stdout().flush().unwrap();
+        //print read bytes as string
+      }
+      //on nothing currently to read
+      Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+        continue;
+        //std::thread::sleep(Duration::from_millis(100)); // Wait and retry
+      }
+      //on stream read error
+      Err(e) => {
+        break;
+      }
+    }
+  }
+
+  Ok(())
 }
 

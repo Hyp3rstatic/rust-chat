@@ -20,7 +20,7 @@ fn main() {
   }
   else {
     println!("connecting to tcp server on port {}", port);
-    connect(addr, &port)//.unwrap()
+    connect(addr, &port).unwrap();
   }
 }
 
