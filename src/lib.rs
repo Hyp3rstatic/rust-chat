@@ -64,6 +64,7 @@ pub fn start_server(addr: &str, port: &u16) {
                 for (addr_send, sender) in &mut *sender_list.lock().unwrap() {
                   //msg cloned here in send to avoid lifetime & ownership issues
                   let msg = format!("{}: {}", addr_recv, msg);
+                  println!("sending message to {}", addr_send); //debug
                   sender.send(msg.clone()).unwrap();
                 }
               };
@@ -84,7 +85,7 @@ pub fn start_server(addr: &str, port: &u16) {
                 sender_list.lock().unwrap().remove(addr_recv);
               };
 
-              println!("client {} disconnected", addr);
+              println!("client {} disconnected", addr_recv);
               
               continue;
             },
@@ -195,14 +196,13 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
 
     //on client disconnect
     if buf == [0; 1024] {
-      receiver_sender.send("shutdown".to_string());
+      receiver_sender.send("shutdown".to_string()).unwrap();
       let _ = stream.shutdown(Shutdown::Both);
       break;
     }
     /* skipping request validation for now */
 
     //send message to broadcast thread; also trimming trailing blank characters
-    //also sends client_addr
     broadcast_sender.send(request.to_string().clone().trim_end().to_string()).unwrap();
   }
 }
@@ -243,9 +243,9 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
         break;
       }
       //on bytes read
-      Ok(n) => {
+      Ok(_n) => {
         //convert read data into a utf8 string
-        let mut msg = String::from_utf8_lossy(&buf[..]);
+        let msg = String::from_utf8_lossy(&buf[..]);
         println!("{}", msg);
         stdout().flush().unwrap();
         //print read bytes as string
@@ -256,6 +256,7 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
       }
       //on stream read error
       Err(e) => {
+        println!("{}", e);
         break;
       }
     }
