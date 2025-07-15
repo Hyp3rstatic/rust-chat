@@ -12,7 +12,7 @@ fn port_is_available (addr: &str, port: u16) -> bool {
 
 fn main() {
   let port = 8080;
-  let addr = "127.0.0.1";
+  let addr = "0.0.0.0";
 
   if port_is_available(addr, port) {
     println!("starting tcp server on port {}", port);

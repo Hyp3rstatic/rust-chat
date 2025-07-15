@@ -21,12 +21,12 @@ pub fn start_server(addr: &str, port: &u16) {
   println!("server listening on {}:{}", addr, port);
 
   //create a sender and receiver list that can be modified across different threads
-  //key: port:ip, value: reciever/sender
+  //key: port:ip, value: receiver/sender
   //specific vars used by broadcaster thread
   let sender_list = Arc::new(Mutex::new(HashMap::< String, Sender<String> > ::new()));
   let receiver_list = Arc::new(Mutex::new(HashMap::< String, Receiver<String> >::new()));
 
-  //create a sender and reciever list for adding new channels on the listener thread
+  //create a sender and receiver list for adding new channels on the listener thread
   let receiver_list_addto = receiver_list.clone();
   let sender_list_addto = sender_list.clone();
   
@@ -42,6 +42,9 @@ pub fn start_server(addr: &str, port: &u16) {
 
   //code for broadcaster
   spawn(move || {
+    //have a vec for storing the addrs that should be removed at the end of an iteration
+    let mut addr_removal_list = Vec::new();
+
     loop {
       let _receiver_list_lock = {
         for (addr_recv, receiver) in &mut *receiver_list.lock().unwrap() {
@@ -58,22 +61,38 @@ pub fn start_server(addr: &str, port: &u16) {
             }
             //on empty receive
             Err(TryRecvError::Empty) => {
+              //println!("HERE"); //debug
               continue;
             }
             //on connected channel disconnect
             Err(TryRecvError::Disconnected) => {
+              println!("Here"); //debug
+              //add disconnected addr to removal list
+              addr_removal_list.push(addr_recv.clone());
+
               //remove addr-sender pairs from both connection lists
               let _sender_list_lock = {
-                receiver_list.lock().unwrap().remove(addr_recv);
-                sender_list.lock().unwrap().remove(addr_recv);
-                println!("{:?}", receiver_list);
-                println!("{:?}", sender_list);
+                //receiver_list.lock().unwrap().remove(addr_recv);
+
+              //remove disconnected client from sender list immediately
+              sender_list.lock().unwrap().remove(addr_recv);
+
+                //println!("{:?}", receiver_list); //debug
+                //println!("{:?}", sender_list); //debug
               };
               println!("client disconnected"); //debug
               //remove sender and receiever from lists
+              continue;
             },
           }
         }
+        //remove all clients in removal list
+        for addr in addr_removal_list.iter() {
+          let _receiver_list_lock = {
+            receiver_list.lock().unwrap().remove(addr);
+          };
+        }
+        addr_removal_list.clear();
       };
     }
   });
@@ -116,9 +135,30 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
   //create a stream handle for the broadcast_thread
   let mut stream_broadcast_handle = stream.try_clone().unwrap();
 
-  //spawn a thread to check for broadcast_reciever messages to write to the client
+  //create channels for receiver-reader thread communication
+  let (receiver_sender, reader_receiver) = channel::<String>();
+
+  //spawn a thread to check for broadcast_receiver messages to write to the client
   spawn(move || {
     loop {
+        //getting messages from reader thread
+        match reader_receiver.try_recv() {
+        //on succesful receive
+        Ok(msg) => {
+          if msg == "shutdown" {
+            println!("quitting"); //debug
+            break;
+          }
+        }
+        //on empty receive
+        Err(TryRecvError::Empty) => {
+        }
+        //on receiver and reader lost communication... abort now
+        Err(TryRecvError::Disconnected) => {
+          break;
+        },
+      }
+      //getting messages from broadcaster
       match broadcast_receiver.try_recv() {
         //on succesful receive
         Ok(msg) => {
@@ -148,6 +188,12 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
       .filter(|c| !['\0'].contains(c))
       .collect();
 
+    //on client disconnect
+    if buf == [0; 1024] {
+      receiver_sender.send("shutdown".to_string());
+      let _ = stream.shutdown(Shutdown::Both);
+      break;
+    }
     /* skipping request validation for now */
 
     //send message to broadcast thread; also trimming trailing blank characters
