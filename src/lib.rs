@@ -32,29 +32,31 @@ pub fn start_server(addr: &str, port: &u16) {
 
   //code for broadcaster
   spawn(move || {
-    let _receiver_list_lock = {
-      for receiver in &mut *receiver_list.lock().unwrap() {
-        match receiver.try_recv() {
-          //on succesful receive
-          Ok(msg) => {
-            let _sender_list_lock = {
-              for sender in &mut *sender_list.lock().unwrap() {
-                //msg cloned here in send to avoid lifetime & ownership issues
-                sender.send(msg.clone()).unwrap();
-              }
-            };
+    loop {
+      let _receiver_list_lock = {
+        for receiver in &mut *receiver_list.lock().unwrap() {
+          match receiver.try_recv() {
+            //on succesful receive
+            Ok(msg) => {
+              let _sender_list_lock = {
+                for sender in &mut *sender_list.lock().unwrap() {
+                  //msg cloned here in send to avoid lifetime & ownership issues
+                  sender.send(msg.clone()).unwrap();
+                }
+              };
+            }
+            //on empty receive
+            Err(TryRecvError::Empty) => {
+              continue;
+            }
+            //on connected channel disconnect
+            Err(TryRecvError::Disconnected) => {
+              //remove sender and receiever from lists
+            },
           }
-          //on empty receive
-          Err(TryRecvError::Empty) => {
-            continue;
-          }
-          //on connected channel disconnect
-          Err(TryRecvError::Disconnected) => {
-            //remove sender and receiever from lists
-          },
         }
-      }
-    };
+      };
+    }
   });
 
   //handle the incoming connections to the server
@@ -146,6 +148,7 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
 
   //handle user inputs
   spawn (move || {
+    loop {
     //create a new input string to read stdin into
     let mut input = String::new();
 
@@ -154,6 +157,7 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
     
     //write input to server
     stream_input_handler.write(input.as_bytes()).unwrap();
+    }
   });
 
 
