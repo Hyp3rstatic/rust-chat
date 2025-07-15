@@ -51,6 +51,7 @@ pub fn start_server(addr: &str, port: &u16) {
             }
             //on connected channel disconnect
             Err(TryRecvError::Disconnected) => {
+              println!("client disconnected"); //debug
               //remove sender and receiever from lists
             },
           }
@@ -125,13 +126,11 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
     request = request.to_string().chars()
       .filter(|c| !['\0'].contains(c))
       .collect();
-    //remove any trailing blank characters
-    //request = request.trim_end();
 
     /* skipping request validation for now */
 
-    //send message to broadcast thread
-    broadcast_sender.send(request.to_string().clone()).unwrap();
+    //send message to broadcast thread; also trimming trailing blank characters
+    broadcast_sender.send(request.to_string().clone().trim_end().to_string()).unwrap();
   }
 }
 
@@ -182,7 +181,6 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
       //on nothing currently to read
       Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
         continue;
-        //std::thread::sleep(Duration::from_millis(100)); // Wait and retry
       }
       //on stream read error
       Err(e) => {
