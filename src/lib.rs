@@ -7,9 +7,18 @@ use std::net::{Shutdown};
 use std::collections::{HashMap};
 
 /*
+  todos:
+
+  login: enter a unique username at server join
+  local-network functionality
+  add a prompter for the user input
+  create test to see how much the server can handle
+*/
+
+/*
   channel identification:
-  channels are paired with the clients addr and port when put into the lists
-  on disconnects the clients addr and port can be used to be remove associated channels from the list
+  channels are paired with the client's addr and port when put into the lists
+  on disconnects the client's addr and port can be used to be remove associated channels from the list
   ensure that on removal the iteration sequence for connected clients is not disturbed
   Pro Tip: HashMap
 */
@@ -70,23 +79,19 @@ pub fn start_server(addr: &str, port: &u16) {
               //add disconnected addr to removal list
               addr_removal_list.push(addr_recv.clone());
 
-              //remove addr-sender pairs from both connection lists
-              let _sender_list_lock = {
-                //receiver_list.lock().unwrap().remove(addr_recv);
-
               //remove disconnected client from sender list immediately
-              sender_list.lock().unwrap().remove(addr_recv);
-
-                //println!("{:?}", receiver_list); //debug
-                //println!("{:?}", sender_list); //debug
+              let _sender_list_lock = {
+                sender_list.lock().unwrap().remove(addr_recv);
               };
-              println!("client disconnected"); //debug
-              //remove sender and receiever from lists
+
+              println!("client {} disconnected", addr);
+              
               continue;
             },
           }
         }
-        //remove all clients in removal list
+        //remove all clients in removal list from reciever list
+        //done after iteration loop to prevent unpredictable behavior
         for addr in addr_removal_list.iter() {
           let _receiver_list_lock = {
             receiver_list.lock().unwrap().remove(addr);
@@ -226,7 +231,6 @@ pub fn connect (addr: &str, port: &u16) -> Result<()>{
     stream_input_handler.write(input.as_bytes()).unwrap();
     }
   });
-
 
   loop {
     //set a buffer size for stream reads
