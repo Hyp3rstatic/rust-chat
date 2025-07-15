@@ -4,6 +4,15 @@ use std::thread::{spawn};
 use std::sync::mpsc::{channel, TryRecvError, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::net::{Shutdown};
+use std::collections::{HashMap};
+
+/*
+  channel identification:
+  channels are paired with the clients addr and port when put into the lists
+  on disconnects the clients addr and port can be used to be remove associated channels from the list
+  ensure that on removal the iteration sequence for connected clients is not disturbed
+  Pro Tip: HashMap
+*/
 
 /* start_server: start and run a tcp chat server */
 pub fn start_server(addr: &str, port: &u16) {
@@ -12,9 +21,10 @@ pub fn start_server(addr: &str, port: &u16) {
   println!("server listening on {}:{}", addr, port);
 
   //create a sender and receiver list that can be modified across different threads
+  //key: port:ip, value: reciever/sender
   //specific vars used by broadcaster thread
-  let sender_list = Arc::new(Mutex::new(Vec::<Sender<String>>::new()));
-  let receiver_list = Arc::new(Mutex::new(Vec::<Receiver<String>>::new()));
+  let sender_list = Arc::new(Mutex::new(HashMap::< String, Sender<String> > ::new()));
+  let receiver_list = Arc::new(Mutex::new(HashMap::< String, Receiver<String> >::new()));
 
   //create a sender and reciever list for adding new channels on the listener thread
   let receiver_list_addto = receiver_list.clone();
@@ -34,13 +44,14 @@ pub fn start_server(addr: &str, port: &u16) {
   spawn(move || {
     loop {
       let _receiver_list_lock = {
-        for receiver in &mut *receiver_list.lock().unwrap() {
+        for (addr_recv, receiver) in &mut *receiver_list.lock().unwrap() {
           match receiver.try_recv() {
             //on succesful receive
             Ok(msg) => {
               let _sender_list_lock = {
-                for sender in &mut *sender_list.lock().unwrap() {
+                for (addr_send, sender) in &mut *sender_list.lock().unwrap() {
                   //msg cloned here in send to avoid lifetime & ownership issues
+                  let msg = format!("{}: {}", addr_recv, msg);
                   sender.send(msg.clone()).unwrap();
                 }
               };
@@ -51,6 +62,13 @@ pub fn start_server(addr: &str, port: &u16) {
             }
             //on connected channel disconnect
             Err(TryRecvError::Disconnected) => {
+              //remove addr-sender pairs from both connection lists
+              let _sender_list_lock = {
+                receiver_list.lock().unwrap().remove(addr_recv);
+                sender_list.lock().unwrap().remove(addr_recv);
+                println!("{:?}", receiver_list);
+                println!("{:?}", sender_list);
+              };
               println!("client disconnected"); //debug
               //remove sender and receiever from lists
             },
@@ -69,14 +87,17 @@ pub fn start_server(addr: &str, port: &u16) {
         let (stream_sender, broadcast_receiver) = channel::<String>();
         let (broadcast_sender, stream_receiver) = channel::<String>();
 
+        //create string of client address:port
+        let client_addr = format!("{}", stream.peer_addr().unwrap());
+
         //add new stream_sender to list of senders
         let _sender_list_lock = {
-          sender_list_addto.lock().unwrap().push(stream_sender);
+          sender_list_addto.lock().unwrap().insert(client_addr.clone(), stream_sender);
         };
 
         //add new stream_receiver to list of receivers
         let _receiver_list_lock = {
-          receiver_list_addto.lock().unwrap().push(stream_receiver);
+          receiver_list_addto.lock().unwrap().insert(client_addr.clone(), stream_receiver);
         };
 
         //spawn a thread to handle the new connection
@@ -130,6 +151,7 @@ fn handle_connection(mut stream: TcpStream, broadcast_sender: Sender<String>, br
     /* skipping request validation for now */
 
     //send message to broadcast thread; also trimming trailing blank characters
+    //also sends client_addr
     broadcast_sender.send(request.to_string().clone().trim_end().to_string()).unwrap();
   }
 }
